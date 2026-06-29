@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Q-Learning Lab — เรียนรู้จากศูนย์</title>
+<style>
+  :root{
+    --ink:#0e1116; --panel:#161b22; --panel2:#1c232d; --line:#2a323d;
+    --text:#e6edf3; --muted:#8b98a5; --dim:#5b6673;
+    --amber:#f0a830; --pos:#3fb950; --neg:#f06a5a; --zero:#3a434f;
+    --accent:#58a6ff;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --sans:"Inter",-apple-system,"Segoe UI","Noto Sans Thai",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--ink);color:var(--text);font-family:var(--sans);
+    line-height:1.55;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+  header h1{font-size:26px;margin:0 0 4px;letter-spacing:-.01em;font-weight:650}
+  header h1 .k{color:var(--amber)}
+  header p{color:var(--muted);margin:0 0 22px;font-size:14.5px;max-width:760px}
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:22px}
+  @media(max-width:920px){.layout{grid-template-columns:1fr}}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);
+    margin:0 0 12px;font-weight:600}
+
+  /* grid svg */
+  #gridWrap{display:flex;justify-content:center}
+  svg{width:100%;height:auto;max-width:520px;touch-action:none}
+  .cellbg{fill:var(--panel2)}
+  .gridline{stroke:var(--line);stroke-width:1}
+  .walltxt,.celltag{font-family:var(--sans);font-weight:700;fill:var(--text)}
+
+  /* controls */
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  button{
+    font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--text);
+    background:var(--panel2);border:1px solid var(--line);border-radius:9px;
+    padding:9px 14px;cursor:pointer;transition:.12s;
+  }
+  button:hover{border-color:var(--dim);background:#222b36}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  button.primary{background:var(--amber);color:#1a1205;border-color:var(--amber)}
+  button.primary:hover{filter:brightness(1.08)}
+  button.danger{color:var(--neg)}
+
+  .sliders{display:grid;gap:14px;margin-top:4px}
+
+  .rewardgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  label.rw{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--text)}
+  label.rw input{font-family:var(--mono);font-size:14px;color:var(--amber);background:var(--panel2);
+    border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+  label.rw input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+  .slider label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
+  .slider label .name{color:var(--text);font-weight:600}
+  .slider label .name small{color:var(--dim);font-weight:400;margin-left:6px}
+  .slider label .val{font-family:var(--mono);color:var(--amber)}
+  input[type=range]{width:100%;accent-color:var(--amber);height:4px}
+
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin-top:4px}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+  .stat .lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+  .stat .num{font-family:var(--mono);font-size:19px;font-weight:600;margin-top:2px}
+
+  /* bellman panel */
+  .eq{font-family:var(--mono);font-size:13px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:10px;padding:13px 14px;line-height:2;overflow-x:auto}
+  .eq .lbl{color:var(--muted)}
+  .eq .qold{color:var(--accent)} .eq .r{color:var(--amber)}
+  .eq .maxq{color:var(--pos)} .eq .tderr{color:var(--neg)}
+  .eq .qnew{color:#fff;font-weight:700}
+  .eq .op{color:var(--dim)}
+  .eq hr{border:none;border-top:1px dashed var(--line);margin:8px 0}
+  .eq .none{color:var(--dim);font-style:italic}
+
+  .legend{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:12px;color:var(--muted)}
+  .bar{height:9px;flex:1;border-radius:5px;
+    background:linear-gradient(90deg,var(--neg),var(--zero) 50%,var(--pos))}
+
+  .speedrow{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:13px;color:var(--muted)}
+  .speedrow input{flex:1}
+
+  details{margin-top:22px;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:0 16px}
+  details summary{cursor:pointer;padding:14px 0;font-weight:600;font-size:14px;list-style:none}
+  details summary::-webkit-details-marker{display:none}
+  details summary::before{content:"▸ ";color:var(--amber)}
+  details[open] summary::before{content:"▾ "}
+  details .body{padding:0 0 16px;color:var(--cbd,#c2ccd6);font-size:13.5px}
+  details code{font-family:var(--mono);background:var(--panel2);padding:1px 6px;border-radius:5px;color:var(--amber)}
+  .foot{color:var(--dim);font-size:12px;margin-top:26px;text-align:center}
+
+  /* history table */
+  .histhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .histbtns{display:flex;align-items:center;gap:8px}
+  .hint{font-size:12px;color:var(--dim)}
+  .tablewrap{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+  table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+  thead th{position:sticky;top:0;background:var(--panel2);color:var(--muted);font-weight:600;
+    text-align:right;padding:9px 11px;border-bottom:1px solid var(--line);z-index:1}
+  thead th:nth-child(1),thead th:nth-child(2),thead th:nth-child(3),thead th:nth-child(4),thead th:nth-child(6),thead th:nth-child(7),thead th:nth-child(9),thead th:last-child{text-align:center}
+  thead th:nth-child(5){text-align:left}
+  tbody td{padding:7px 11px;text-align:right;border-bottom:1px solid #20272f;color:#c9d3dd}
+  tbody td:nth-child(-n+3),tbody td.c{text-align:center}
+  tbody tr:hover{background:#1b222b}
+  tbody tr.latest{background:rgba(240,168,48,.10)}
+  tbody tr.latest td{color:#fff}
+  tbody tr.epstart td{border-top:2px solid var(--line)}
+  td.tdpos{color:var(--pos)} td.tdneg{color:var(--neg)} td.tdzero{color:var(--dim)}
+  td.act{color:var(--amber);font-weight:700;font-size:14px}
+  td.qrow{text-align:left;font-size:11.5px;letter-spacing:.02em}
+  td.qrow .qval{color:var(--dim);margin-right:7px}
+  td.qrow .qmax{color:var(--pos);font-weight:700;margin-right:7px}
+  .pick{display:inline-block;padding:1px 7px;border-radius:5px;font-size:11px;font-weight:700;white-space:nowrap}
+  .pick.greedy{background:rgba(88,166,255,.16);color:var(--accent)}
+  .pick.rand{background:rgba(240,168,48,.16);color:var(--amber)}
+  .donechip{display:inline-block;min-width:18px;padding:0 6px;border-radius:5px;font-size:11px;font-weight:700}
+  .donechip.win{background:rgba(63,185,80,.18);color:var(--pos)}
+  .donechip.lose{background:rgba(240,106,90,.18);color:var(--neg)}
+  .donechip.mid{color:var(--dim)}
+
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="k">Q-Learning</span> Lab — เรียนรู้จากศูนย์</h1>
+    <p>เอเจนต์ (จุดสีเหลือง) ต้องหาทางจากมุมซ้ายบนไปยังเป้าหมาย 🏁 โดยหลบหลุม 🕳️ และกำแพง
+       สามเหลี่ยมในแต่ละช่องคือค่า <b>Q</b> ของ 4 ทิศ (เขียว=ดี แดง=แย่) ลูกศรขาวคือนโยบายปัจจุบัน
+       ดู panel ขวาเพื่อเห็นสมการ Bellman อัปเดตทีละก้าว</p>
+  </header>
+
+  <div class="layout">
+    <!-- LEFT -->
+    <div>
+      <div class="card">
+        <div id="gridWrap"><svg id="grid" viewBox="0 0 500 500" role="img" aria-label="Grid world"></svg></div>
+        <div class="legend">
+          <span>Q ต่ำ</span><div class="bar"></div><span>Q สูง</span>
+        </div>
+        <div class="controls">
+          <button id="play" class="primary">▶ เล่นต่อเนื่อง</button>
+          <button id="step">ก้าวเดียว</button>
+          <button id="ep100">⏩ เทรน ×100 ตอน</button>
+          <button id="resetAgent">วางเอเจนต์ใหม่</button>
+          <button id="resetQ" class="danger">ล้าง Q-table</button>
+        </div>
+        <div class="speedrow">
+          <span>ช้า</span><input id="speed" type="range" min="20" max="400" value="180"><span>เร็ว</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div>
+      <div class="card" style="margin-bottom:18px">
+        <h2>ไฮเปอร์พารามิเตอร์</h2>
+        <div class="sliders">
+          <div class="slider"><label>
+            <span class="name">α <small>learning rate</small></span><span class="val" id="aVal">0.30</span></label>
+            <input id="alpha" type="range" min="0.01" max="1" step="0.01" value="0.30"></div>
+          <div class="slider"><label>
+            <span class="name">γ <small>discount</small></span><span class="val" id="gVal">0.95</span></label>
+            <input id="gamma" type="range" min="0" max="0.99" step="0.01" value="0.95"></div>
+          <div class="slider"><label>
+            <span class="name">ε <small>explore</small></span><span class="val" id="eVal">0.30</span></label>
+            <input id="eps" type="range" min="0" max="1" step="0.01" value="0.30"></div>
+        </div>
+        <div class="stats" style="margin-top:16px">
+          <div class="stat"><div class="lab">ตอน (episode)</div><div class="num" id="sEp">0</div></div>
+          <div class="stat"><div class="lab">ก้าวในตอนนี้</div><div class="num" id="sStep">0</div></div>
+          <div class="stat"><div class="lab">ถึงเป้า (ครั้ง)</div><div class="num" id="sWin">0</div></div>
+          <div class="stat"><div class="lab">รางวัลตอนล่าสุด</div><div class="num" id="sRet">0.0</div></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:18px">
+        <div class="histhead" style="margin-bottom:12px">
+          <h2 style="margin:0">รางวัล (reward) <span style="text-transform:none;letter-spacing:0;color:var(--dim);font-weight:400">— ปรับได้</span></h2>
+          <button id="resetReward" style="padding:5px 10px;font-size:12px">คืนค่าเริ่มต้น</button>
+        </div>
+        <div class="rewardgrid">
+          <label class="rw"><span>🏁 ถึงเป้า</span>
+            <input id="rGoal" type="number" step="0.5" value="10"></label>
+          <label class="rw"><span>🕳️ ตกหลุม</span>
+            <input id="rPit" type="number" step="0.5" value="-10"></label>
+          <label class="rw"><span>👣 แต่ละก้าว</span>
+            <input id="rStep" type="number" step="0.1" value="-0.1"></label>
+          <label class="rw"><span>🧱 ชนกำแพง</span>
+            <input id="rBump" type="number" step="0.1" value="-0.1"></label>
+        </div>
+        <p class="hint" style="margin:11px 2px 0">มีผลกับก้าวถัดไปทันที — แต่ Q-table เดิมยังจำรางวัลเก่าอยู่
+          ถ้าอยากเห็นผลของรางวัลใหม่ชัดๆ แนะนำให้กด “ล้าง Q-table” แล้วเทรนใหม่</p>
+      </div>
+
+      <div class="card">
+        <h2>Bellman update — ก้าวล่าสุด</h2>
+        <div class="eq" id="eqPanel"><span class="none">ยังไม่มีก้าว — กด “ก้าวเดียว” เพื่อเริ่ม</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:22px">
+    <div class="histhead">
+      <h2 style="margin:0">ตารางประวัติการเรียนรู้ <span style="text-transform:none;letter-spacing:0;color:var(--dim);font-weight:400">— ทุกก้าวคือ transition (s, a, r, s′)</span></h2>
+      <div class="histbtns">
+        <span class="hint" id="histCount">0 ก้าว</span>
+        <button id="exportCsv">⬇ CSV</button>
+        <button id="clearLog" class="danger">ล้างตาราง</button>
+      </div>
+    </div>
+    <div class="tablewrap">
+      <table id="histTable">
+        <thead><tr>
+          <th>#</th><th>ตอน</th><th>ก้าวที่</th>
+          <th>s</th>
+          <th>Q(s,·) ก่อนเลือก</th><th>เลือกโดย</th>
+          <th>a</th><th>r</th><th>s′</th>
+          <th>max&nbsp;Q(s′)</th><th>target</th><th>TD&nbsp;error</th>
+          <th>Q(s,a) เก่า → ใหม่</th><th>จบตอน</th>
+        </tr></thead>
+        <tbody id="histBody"></tbody>
+      </table>
+    </div>
+    <p class="hint" style="margin:10px 2px 0">แถวบนสุด = ก้าวล่าสุด · บันทึกเฉพาะโหมด “ก้าวเดียว / เล่นต่อเนื่อง” (โหมดเทรน ×100 ข้ามการบันทึกเพื่อความลื่น) · เก็บล่าสุดสูงสุด 500 ก้าว</p>
+  </div>
+
+  <details>
+    <summary>สมการที่ใช้ และวิธีอ่าน panel</summary>
+    <div class="body">
+      <p>กฎอัปเดตคือ:
+      <code>Q(s,a) ← Q(s,a) + α · [ r + γ·max Q(s′,a′) − Q(s,a) ]</code></p>
+      <p>ก้อนในวงเล็บคือ <b>TD error</b> = (สิ่งที่ควรเป็น) − (สิ่งที่เชื่ออยู่). ถ้า error เป็นบวก
+      แปลว่าทางนี้ดีกว่าที่คิด → ดัน Q ขึ้น; ถ้าลบ → กด Q ลง. ขนาดที่ขยับถูกคูณด้วย α</p>
+      <p>รางวัลเริ่มต้น: ถึงเป้า <code>+10</code>, ตกหลุม <code>−10</code>, แต่ละก้าว <code>−0.1</code>
+      (ลงโทษเล็กน้อยเพื่อบีบให้หาเส้นทางสั้นที่สุด), ชนกำแพง <code>−0.1</code> — ทั้งหมดปรับได้ที่การ์ด “รางวัล”</p>
+      <p><b>ลองออกแบบรางวัล (reward shaping):</b> ตั้งค่าก้าวเป็น <code>0</code> แล้วเทรน — เอเจนต์จะไม่รีบ
+      เพราะการเดินวนไม่เสียอะไร เส้นทางที่ได้อาจอ้อม. เพิ่มโทษชนกำแพงเป็น <code>−1</code> จะเห็นว่ามันเรียนรู้
+      หลบกำแพงเร็วขึ้น. หรือลองทำให้ตกหลุมเป็น <code>+5</code> (รางวัลบวก!) เอเจนต์จะ “วิ่งหาหลุม” แทนเป้า —
+      ตัวอย่างคลาสสิกว่ารางวัลที่ออกแบบผิดทำให้ AI เรียนรู้พฤติกรรมที่เราไม่ต้องการ</p>
+      <p><b>ทดลองดู:</b> ตั้ง γ=0 แล้วเทรน — เอเจนต์จะ “สายตาสั้น” มองไม่เห็นเป้าจนกว่าจะอยู่ติดมัน
+      เพราะมันไม่สนรางวัลอนาคต. เพิ่ม γ กลับเป็น 0.95 จะเห็นค่า Q “ไหล” ย้อนจากเป้ามาทั่วทั้งกริด</p>
+    </div>
+  </details>
+
+  <p class="foot">Q-Learning Lab · สื่อการสอน Machine Learning</p>
+</div>
+
+<script>
+/* ---------- Environment ---------- */
+const N = 5;                     // grid N x N
+const START = [0,0];
+const GOAL  = [4,4];
+const PITS  = [[1,3],[3,1]];     // [row,col]
+const WALLS = [[1,1],[2,3]];
+const ACTS  = [[-1,0],[1,0],[0,-1],[0,1]]; // up,down,left,right
+const AN    = ['↑','↓','←','→'];
+const ANAME = ['up','down','left','right']; // ASCII labels for CSV export
+
+const isWall = (r,c)=>WALLS.some(w=>w[0]===r&&w[1]===c);
+const isPit  = (r,c)=>PITS.some(p=>p[0]===r&&p[1]===c);
+const isGoal = (r,c)=>r===GOAL[0]&&c===GOAL[1];
+const inBounds=(r,c)=>r>=0&&r<N&&c>=0&&c<N;
+
+// Q[r][c][a]
+let Q, agent, epCount, stepCount, winCount, lastReturn, lastUpdate;
+function freshQ(){
+  Q = Array.from({length:N},()=>Array.from({length:N},()=>[0,0,0,0]));
+}
+function resetAll(){
+  freshQ(); agent=[...START]; epCount=0; stepCount=0; winCount=0; lastReturn=0;
+  lastUpdate=null; epReturn=0; history=[]; gStep=0;
+  draw(); updateStats(); drawEq(); renderHistory();
+}
+function resetAgentPos(){ agent=[...START]; stepCount=0; epReturn=0; draw(); updateStats(); }
+
+let epReturn = 0;
+let history = [];   // transition log: {g,ep,stepInEp,s,a,r,sp,maxq,target,td,qOld,qNew,done}
+let gStep = 0;      // running global step counter
+const HIST_MAX = 500;
+
+function logStep(rec){
+  rec.g = ++gStep;
+  history.push(rec);
+  if(history.length > HIST_MAX) history.shift();
+}
+
+function maxQ(r,c){ return Math.max(...Q[r][c]); }
+function argmaxQ(r,c){
+  let best=0,bv=Q[r][c][0];
+  for(let a=1;a<4;a++){ if(Q[r][c][a]>bv){bv=Q[r][c][a];best=a;} }
+  return best;
+}
+
+function takeStep(){
+  const a = readA(), g = readG(), e = readE();
+  const [r,c] = agent;
+  // choose action: epsilon-greedy
+  // --- before choosing: snapshot the state's Q-row and the greedy action ---
+  const qSnap = [...Q[r][c]];          // Q(s,·) before any update this step
+  const greedyAct = argmaxQ(r,c);      // action that max-Q would pick
+  const wasRandom = Math.random() < e; // explore?
+  let act = wasRandom ? Math.floor(Math.random()*4) : greedyAct;
+  let [nr,nc] = [r+ACTS[act][0], c+ACTS[act][1]];
+  let reward, terminal=false, bumped=false;
+  if(!inBounds(nr,nc) || isWall(nr,nc)){ nr=r; nc=c; bumped=true; reward=readRBump(); }
+  else if(isGoal(nr,nc)){ reward=readRGoal(); terminal=true; }
+  else if(isPit(nr,nc)){ reward=readRPit(); terminal=true; }
+  else reward=readRStep();
+
+  // Bellman update
+  const qOld = Q[r][c][act];
+  const futureMax = terminal ? 0 : maxQ(nr,nc);
+  const target = reward + g*futureMax;
+  const tdErr  = target - qOld;
+  const qNew   = qOld + a*tdErr;
+  Q[r][c][act] = qNew;
+
+  lastUpdate = {r,c,act,reward,terminal,nr,nc,qOld,futureMax,target,tdErr,qNew,g,a,bumped};
+  epReturn += reward; stepCount++;
+  agent = [nr,nc];
+
+  logStep({ep:epCount, stepInEp:stepCount, s:[r,c], a:act, r:reward, sp:[nr,nc],
+           maxq:futureMax, target, td:tdErr, qOld, qNew, done:terminal, bumped,
+           qSnap, greedyAct, wasRandom});
+
+  if(terminal || stepCount>=120){
+    if(terminal && isGoal(nr,nc)) winCount++;
+    lastReturn = epReturn;
+    epCount++; agent=[...START]; stepCount=0; epReturn=0;
+  }
+  draw(); updateStats(); drawEq(); renderHistory();
+}
+
+// run a full episode instantly (no draw between)
+function runEpisode(){
+  const a=readA(),g=readG(),e=readE();
+  let pos=[...START], steps=0, terminal=false;
+  while(!terminal && steps<200){
+    const [r,c]=pos;
+    let act = Math.random()<e?Math.floor(Math.random()*4):argmaxQ(r,c);
+    let [nr,nc]=[r+ACTS[act][0],c+ACTS[act][1]];
+    let reward;
+    if(!inBounds(nr,nc)||isWall(nr,nc)){nr=r;nc=c;reward=readRBump();}
+    else if(isGoal(nr,nc)){reward=readRGoal();terminal=true;}
+    else if(isPit(nr,nc)){reward=readRPit();terminal=true;}
+    else reward=readRStep();
+    const futureMax = terminal?0:maxQ(nr,nc);
+    Q[r][c][act] += a*(reward + g*futureMax - Q[r][c][act]);
+    pos=[nr,nc]; steps++;
+    if(terminal && isGoal(nr,nc)) winCount++;
+  }
+  epCount++;
+}
+
+/* ---------- Rendering ---------- */
+const SVG = document.getElementById('grid');
+const PAD = 6, SIZE = 500, CELL = (SIZE-2*PAD)/N;
+
+function qColor(q){
+  // diverging: neg red -> zero dark -> pos green, scaled by adaptive range
+  const scale = Math.max(2, qScale);
+  const t = Math.max(-1,Math.min(1,q/scale));
+  const dark=[58,67,79];
+  let col;
+  if(t>=0){ col = lerp3(dark,[63,185,80],t); }
+  else    { col = lerp3(dark,[240,106,90],-t); }
+  return `rgb(${col[0]|0},${col[1]|0},${col[2]|0})`;
+}
+function lerp3(a,b,t){return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+let qScale = 2;
+
+function recomputeScale(){
+  let m=2;
+  for(let r=0;r<N;r++)for(let c=0;c<N;c++)for(let a=0;a<4;a++)
+    m=Math.max(m,Math.abs(Q[r][c][a]));
+  qScale=m;
+}
+
+function tri(cx,cy,h,dir,fill){
+  // dir 0 up,1 down,2 left,3 right — triangle from center to one edge
+  const pts={
+    0:[[cx-h,cy-h],[cx+h,cy-h],[cx,cy]],
+    1:[[cx-h,cy+h],[cx+h,cy+h],[cx,cy]],
+    2:[[cx-h,cy-h],[cx-h,cy+h],[cx,cy]],
+    3:[[cx+h,cy-h],[cx+h,cy+h],[cx,cy]],
+  }[dir];
+  return `<polygon points="${pts.map(p=>p.join(',')).join(' ')}" fill="${fill}"/>`;
+}
+
+function draw(){
+  recomputeScale();
+  let s='';
+  for(let r=0;r<N;r++){
+    for(let c=0;c<N;c++){
+      const x=PAD+c*CELL, y=PAD+r*CELL, cx=x+CELL/2, cy=y+CELL/2, h=CELL/2;
+      if(isWall(r,c)){
+        s+=`<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" fill="#0a0d11"/>`;
+        s+=`<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" fill="none" stroke="#2a323d"/>`;
+        s+=`<text class="walltxt" x="${cx}" y="${cy+5}" text-anchor="middle" font-size="20" fill="#3a434f">▦</text>`;
+        continue;
+      }
+      // 4 Q triangles
+      s+=`<rect class="cellbg" x="${x}" y="${y}" width="${CELL}" height="${CELL}"/>`;
+      for(let a=0;a<4;a++) s+=tri(cx,cy,h,a,qColor(Q[r][c][a]));
+      // diagonals + border
+      s+=`<line class="gridline" x1="${x}" y1="${y}" x2="${x+CELL}" y2="${y+CELL}"/>`;
+      s+=`<line class="gridline" x1="${x+CELL}" y1="${y}" x2="${x}" y2="${y+CELL}"/>`;
+      s+=`<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" fill="none" stroke="#2a323d"/>`;
+      // tags for goal/pit
+      if(isGoal(r,c)) s+=`<text class="celltag" x="${cx}" y="${cy+8}" text-anchor="middle" font-size="26">🏁</text>`;
+      else if(isPit(r,c)) s+=`<text class="celltag" x="${cx}" y="${cy+8}" text-anchor="middle" font-size="24">🕳️</text>`;
+      else {
+        // policy arrow (greedy) — only where some Q learned
+        const anyQ = Q[r][c].some(v=>v!==0);
+        if(anyQ){
+          const best=argmaxQ(r,c);
+          s+=`<text x="${cx}" y="${cy+7}" text-anchor="middle" font-size="22" font-weight="700"
+                 fill="rgba(255,255,255,.92)">${AN[best]}</text>`;
+        }
+      }
+    }
+  }
+  // agent
+  const [ar,ac]=agent;
+  const acx=PAD+ac*CELL+CELL/2, acy=PAD+ar*CELL+CELL/2;
+  s+=`<circle cx="${acx}" cy="${acy}" r="${CELL*0.26}" fill="#f0a830" stroke="#1a1205" stroke-width="2.5"/>`;
+  SVG.innerHTML=s;
+}
+
+/* ---------- Bellman panel ---------- */
+function drawEq(){
+  const p=document.getElementById('eqPanel');
+  if(!lastUpdate){ p.innerHTML='<span class="none">ยังไม่มีก้าว — กด “ก้าวเดียว” เพื่อเริ่ม</span>'; return; }
+  const u=lastUpdate, f=x=>x.toFixed(2);
+  const term = u.terminal ? ' <span class="lbl">(ปลายทาง → max Q(s′)=0)</span>' : '';
+  p.innerHTML =
+    `<div><span class="lbl">s</span>=(${u.r},${u.c}) <span class="lbl">a</span>=${AN[u.act]}`+
+    ` <span class="lbl">→ s′</span>=(${u.nr},${u.nc})${u.bumped?' <span class="lbl">(ชนกำแพง)</span>':''}</div>`+
+    `<hr>`+
+    `<div><span class="r">r</span> = ${f(u.reward)}`+
+    `  ·  <span class="maxq">max Q(s′,a′)</span> = ${f(u.futureMax)}${term}</div>`+
+    `<div><span class="lbl">target</span> = r + γ·maxQ = ${f(u.reward)} + ${f(u.g)}×${f(u.futureMax)}`+
+    ` = <b>${f(u.target)}</b></div>`+
+    `<div><span class="tderr">TD error</span> = target − Q(s,a) = ${f(u.target)} − ${f(u.qOld)}`+
+    ` = <b>${f(u.tdErr)}</b></div>`+
+    `<hr>`+
+    `<div><span class="qold">Q(s,a)</span>: ${f(u.qOld)}`+
+    ` <span class="op">+</span> ${f(u.a)}×(${f(u.tdErr)})`+
+    ` <span class="op">=</span> <span class="qnew">${f(u.qNew)}</span></div>`;
+}
+
+/* ---------- History table ---------- */
+const histBody = document.getElementById('histBody');
+function renderHistory(){
+  document.getElementById('histCount').textContent = gStep + ' ก้าว';
+  const f=x=>x.toFixed(2);
+  let rows='';
+  // newest first
+  for(let i=history.length-1;i>=0;i--){
+    const h=history[i];
+    const isLatest = (i===history.length-1);
+    const epStart  = (h.stepInEp===1);
+    const tdCls = h.td>0.005 ? 'tdpos' : (h.td<-0.005 ? 'tdneg' : 'tdzero');
+    let chip;
+    if(h.done){
+      const win = h.sp[0]===GOAL[0] && h.sp[1]===GOAL[1];
+      chip = `<span class="donechip ${win?'win':'lose'}">${win?'🏁 ถึง':'🕳 ตก'}</span>`;
+    } else chip = `<span class="donechip mid">·</span>`;
+
+    // Q(s,·) before choosing: show all 4, bold-green the greedy(max), box the chosen
+    let qcell='';
+    if(h.qSnap){
+      qcell = h.qSnap.map((v,k)=>{
+        const isMax = (k===h.greedyAct);
+        const isPick= (k===h.a);
+        let cls = isMax ? 'qmax' : 'qval';
+        let txt = `${AN[k]}${v.toFixed(1)}`;
+        if(isPick) txt = `[${txt}]`;   // chosen action boxed
+        return `<span class="${cls}">${txt}</span>`;
+      }).join(' ');
+    }
+    const pickChip = h.wasRandom
+      ? `<span class="pick rand">🎲 สุ่ม</span>`
+      : `<span class="pick greedy">⭐ max-Q</span>`;
+
+    rows +=
+      `<tr class="${isLatest?'latest':''} ${epStart?'epstart':''}">`+
+      `<td>${h.g}</td><td>${h.ep}</td><td>${h.stepInEp}</td>`+
+      `<td>(${h.s[0]},${h.s[1]})</td>`+
+      `<td class="qrow">${qcell}</td>`+
+      `<td class="c">${pickChip}</td>`+
+      `<td class="act">${AN[h.a]}</td>`+
+      `<td>${f(h.r)}</td>`+
+      `<td>(${h.sp[0]},${h.sp[1]})${h.bumped?'*':''}</td>`+
+      `<td>${f(h.maxq)}</td>`+
+      `<td>${f(h.target)}</td>`+
+      `<td class="${tdCls}">${h.td>0?'+':''}${f(h.td)}</td>`+
+      `<td>${f(h.qOld)} → <b>${f(h.qNew)}</b></td>`+
+      `<td class="c">${chip}</td>`+
+      `</tr>`;
+  }
+  histBody.innerHTML = rows;
+}
+
+function exportCsv(){
+  const head=['step','episode','step_in_ep','s_row','s_col',
+              'q_up_before','q_down_before','q_left_before','q_right_before',
+              'greedy_action','exploration','action','reward',
+              'sp_row','sp_col','bumped','max_q_next','target','td_error','q_old','q_new','done'];
+  const lines=[head.join(',')];
+  for(const h of history){
+    const qs = (h.qSnap||[0,0,0,0]).map(v=>v.toFixed(4));
+    lines.push([h.g,h.ep,h.stepInEp,h.s[0],h.s[1],
+      qs[0],qs[1],qs[2],qs[3],
+      ANAME[h.greedyAct], h.wasRandom?1:0, ANAME[h.a], h.r.toFixed(4),
+      h.sp[0],h.sp[1],h.bumped?1:0,h.maxq.toFixed(4),h.target.toFixed(4),
+      h.td.toFixed(4),h.qOld.toFixed(4),h.qNew.toFixed(4),h.done?1:0].join(','));
+  }
+  const blob=new Blob(['\uFEFF'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='qlearning_history.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------- Stats / inputs ---------- */
+function updateStats(){
+  document.getElementById('sEp').textContent=epCount;
+  document.getElementById('sStep').textContent=stepCount;
+  document.getElementById('sWin').textContent=winCount;
+  document.getElementById('sRet').textContent=lastReturn.toFixed(1);
+}
+const readA=()=>parseFloat(document.getElementById('alpha').value);
+const readG=()=>parseFloat(document.getElementById('gamma').value);
+const readE=()=>parseFloat(document.getElementById('eps').value);
+const num=(id,def)=>{const v=parseFloat(document.getElementById(id).value);return isNaN(v)?def:v;};
+const readRGoal=()=>num('rGoal',10);
+const readRPit =()=>num('rPit',-10);
+const readRStep=()=>num('rStep',-0.1);
+const readRBump=()=>num('rBump',-0.1);
+
+function bindSlider(id,labId){
+  const el=document.getElementById(id), lab=document.getElementById(labId);
+  const f=()=>lab.textContent=parseFloat(el.value).toFixed(2);
+  el.addEventListener('input',f); f();
+}
+bindSlider('alpha','aVal'); bindSlider('gamma','gVal'); bindSlider('eps','eVal');
+
+/* ---------- Loop control ---------- */
+let playing=false, timer=null;
+function speedMs(){ return 420 - parseInt(document.getElementById('speed').value); }
+function tick(){ takeStep(); if(playing) timer=setTimeout(tick, speedMs()); }
+const playBtn=document.getElementById('play');
+playBtn.onclick=()=>{
+  playing=!playing;
+  playBtn.textContent = playing ? '⏸ หยุด' : '▶ เล่นต่อเนื่อง';
+  if(playing) tick(); else clearTimeout(timer);
+};
+document.getElementById('step').onclick=()=>{ if(!playing) takeStep(); };
+document.getElementById('ep100').onclick=()=>{
+  for(let i=0;i<100;i++) runEpisode();
+  draw(); updateStats(); drawEq();
+};
+document.getElementById('resetAgent').onclick=resetAgentPos;
+document.getElementById('exportCsv').onclick=()=>{ if(history.length) exportCsv(); };
+document.getElementById('clearLog').onclick=()=>{ history=[]; gStep=0; renderHistory(); };
+document.getElementById('resetReward').onclick=()=>{
+  document.getElementById('rGoal').value=10;
+  document.getElementById('rPit').value=-10;
+  document.getElementById('rStep').value=-0.1;
+  document.getElementById('rBump').value=-0.1;
+};
+document.getElementById('resetQ').onclick=()=>{
+  if(playing){playing=false;clearTimeout(timer);playBtn.textContent='▶ เล่นต่อเนื่อง';}
+  resetAll();
+};
+
+resetAll();
+</script>
+</body>
+</html>
